@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Labs Admin</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  <div id="app" class="max-w-4xl mx-auto p-6"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8c950hL9yK3Q0uxhUgi5fNZNkYqm5bUo",
+      authDomain: "labs-by-shahwaiz-hassan.firebaseapp.com",
+      projectId: "labs-by-shahwaiz-hassan",
+      storageBucket: "labs-by-shahwaiz-hassan.firebasestorage.app",
+      messagingSenderId: "2696204876",
+      appId: "1:2696204876:web:e07d9d2c55733636b51ae9"
+    };
+
+    const ADMIN_PASSWORD = "01234567";
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const appEl = document.getElementById("app");
+
+    function loginScreen() {
+      appEl.innerHTML = `
+        <div class="max-w-sm mx-auto mt-24 bg-slate-800 p-8 rounded-xl shadow-xl">
+          <h1 class="text-2xl font-bold mb-6">Admin Login</h1>
+          <input id="pwd" type="password" placeholder="Password" class="w-full p-3 rounded bg-slate-700 mb-4 outline-none focus:ring-2 focus:ring-indigo-500"/>
+          <button id="loginBtn" class="w-full bg-indigo-600 hover:bg-indigo-500 p-3 rounded font-semibold">Login</button>
+          <p id="err" class="text-red-400 text-sm mt-3 hidden">Galat password</p>
+        </div>`;
+      document.getElementById("loginBtn").onclick = () => {
+        const v = document.getElementById("pwd").value;
+        if (v === ADMIN_PASSWORD) {
+          sessionStorage.setItem("admin", "1");
+          dashboard();
+        } else document.getElementById("err").classList.remove("hidden");
+      };
+    }
+
+    async function dashboard() {
+      appEl.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+          <h1 class="text-3xl font-bold">Admin Dashboard</h1>
+          <button id="logoutBtn" class="bg-red-600 hover:bg-red-500 px-4 py-2 rounded">Logout</button>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mb-6">
+          <div class="bg-slate-800 p-4 rounded-xl"><div class="text-slate-400 text-sm">Simulations</div><div id="simCount" class="text-3xl font-bold">-</div></div>
+          <div class="bg-slate-800 p-4 rounded-xl"><div class="text-slate-400 text-sm">Visits</div><div id="visitCount" class="text-3xl font-bold">-</div></div>
+        </div>
+        <div class="bg-slate-800 p-6 rounded-xl mb-6">
+          <h2 class="text-xl font-semibold mb-4">Add Simulation</h2>
+          <input id="simTitle" placeholder="Title" class="w-full p-3 rounded bg-slate-700 mb-2"/>
+          <input id="simSlug" placeholder="Slug" class="w-full p-3 rounded bg-slate-700 mb-2"/>
+          <textarea id="simDesc" placeholder="Description" class="w-full p-3 rounded bg-slate-700 mb-2"></textarea>
+          <button id="addSimBtn" class="bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded font-semibold">Add</button>
+        </div>
+        <div class="bg-slate-800 p-6 rounded-xl">
+          <h2 class="text-xl font-semibold mb-4">Simulations</h2>
+          <div id="simList" class="space-y-2 text-slate-300">Loading...</div>
+        </div>`;
+
+      document.getElementById("logoutBtn").onclick = () => { sessionStorage.clear(); loginScreen(); };
+
+      try {
+        const snap = await getDocs(collection(db, "simulations"));
+        document.getElementById("simCount").textContent = snap.size;
+        const list = document.getElementById("simList");
+        list.innerHTML = snap.size ? "" : "<p>Koi simulation nahi</p>";
+        snap.forEach(d => {
+          const data = d.data();
+          const div = document.createElement("div");
+          div.className = "border-b border-slate-700 pb-2";
+          div.innerHTML = `<div class="font-semibold">${data.title || d.id}</div><div class="text-sm text-slate-400">${data.description || ""}</div>`;
+          list.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById("simList").textContent = "Error: " + e.message;
+      }
+
+      try {
+        const v = await getDocs(collection(db, "visits"));
+        document.getElementById("visitCount").textContent = v.size;
+      } catch { document.getElementById("visitCount").textContent = "!"; }
+
+      document.getElementById("addSimBtn").onclick = async () => {
+        const title = document.getElementById("simTitle").value.trim();
+        const slug = document.getElementById("simSlug").value.trim();
+        const description = document.getElementById("simDesc").value.trim();
+        if (!title || !slug) return alert("Title aur slug chahiye");
+        try {
+          await addDoc(collection(db, "simulations"), { title, slug, description, createdAt: serverTimestamp() });
+          alert("Added"); dashboard();
+        } catch (e) { alert("Error: " + e.message); }
+      };
+    }
+
+    (async () => {
+      try { await addDoc(collection(db, "visits"), { page: "/", ts: serverTimestamp(), ua: navigator.userAgent }); } catch {}
+    })();
+
+    sessionStorage.getItem("admin") ? dashboard() : loginScreen();
+  </script>
+</body>
+</html>
